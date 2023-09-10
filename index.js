@@ -1,84 +1,27 @@
 import { ApolloServer } from "@apollo/server";
 import { startStandaloneServer } from "@apollo/server/standalone";
-import { PrismaClient } from "@prisma/client";
-const prisma = new PrismaClient();
-
-const typeDefs = `#graphql
-
-    type Post {
-        id: Int!
-        title: String!
-        content: String!
-        createdAt: String!
-        updatedAt: String!
-    }
-
-    type Query {
-        posts: [Post!]!
-        post(id: Int!): Post
-    }
-
-    type Mutation {
-        createPost(title: String!, content: String!): Post!
-        updatePost(id: Int!, title: String!, content: String!): Post!
-        deletePost(id: Int!): Post
-    }
-`;
-
-const resolvers = {
-  Query: {
-    posts: async () => {
-      return await prisma.post.findMany();
-    },
-
-    post: async (_, { id }) => {
-      return await prisma.post.findUnique({
-        where: {
-          id,
-        },
-      });
-    },
-  },
-
-  Mutation: {
-    createPost: async (_, { title, content }) => {
-      return await prisma.post.create({
-        data: {
-          title,
-          content,
-        },
-      });
-    },
-
-    updatePost: async (_, { id, title, content }) => {
-      return await prisma.post.update({
-        where: {
-          id,
-        },
-        data: {
-          title,
-          content,
-        },
-      });
-    },
-
-    deletePost: async (_, { id }) => {
-      return await prisma.post.delete({
-        where: {
-          id,
-        },
-      });
-    },
-  },
-};
+import express from "express";
+import { resolvers } from "./schemas/resolvers.js";
+import { typeDefs } from "./schemas/type-defs.js";
+import { GraphQLError } from "graphql";
+import { getUser } from "./middlewares/get-user.js";
 
 const server = new ApolloServer({
   typeDefs,
   resolvers,
+  introspection: true,
 });
 
 const { url } = await startStandaloneServer(server, {
   listen: { port: 5000 },
+  context: async ({ req, res }) => {
+    const token = req.headers.authorization || "";
+
+    const user = await getUser(token);
+    if (user) {
+      return { user };
+    }
+  },
 });
 
 console.log(`🚀  Server ready at: ${url}`);
